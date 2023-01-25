@@ -22,8 +22,11 @@
 
 # TODO
 Lookup ovl for PRTG
-'''Status
+```job.status
 0	success
+
 1	warning
+
 2	failed
-3	unknown'''
+
+3	unknown
