@@ -22,3 +22,8 @@
 
 # TODO
 Lookup ovl for PRTG
+'''Status
+0	success
+1	warning
+2	failed
+3	unknown'''
