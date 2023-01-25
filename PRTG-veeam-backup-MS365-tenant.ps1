@@ -10,7 +10,7 @@
     - In PRTG, on your probe add EXE/Script Advanced sensor
     - Name the sensor eg: Veeam Backup for Office 365
     - In the EXE/Script dropdown, select the script
-    - In parameters set: -username "%windowsdomain\%windowsuser" -password "%windowspassword" -apiUrl "https://<url-to-vbo-api>:443" -orgName "tenant.onmicrosoft.com" -ignoreDefRepo $false -ignoreSSL $false
+    - In parameters set: -username "%windowsdomain\%windowsuser" -password "%windowspassword" -apiUrl "https://<url-to-vbo-api>:443" -orgName "tenant.onmicrosoft.com" -ignoreDefRepo "false" -ignoreSSL "true"
         - This way the Windows user defined on the probe is used for authenticating to VBO API, make sure the correct permissions are set in VBO for this user
     - Set preferred timeout and interval
     - I've set some default limits on the channels, change them to your preferred levels
@@ -38,9 +38,8 @@ param (
     [string]$ignoreSSL = $(throw "<prtg><error>1</error><text>-ignoreSSL is missing in parameters</text></prtg>")
 )
 
-cls 
 
-if($ignoreSSL -eq $true){
+if($ignoreSSL -eq 'true'){
 add-type @"
     using System.Net;
     using System.Security.Cryptography.X509Certificates;
@@ -71,16 +70,16 @@ $headers = @{
     "Content-Type"= "multipart/form-data"
 }
 
-Try {
+try {
     $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Body $body -Headers $headers -Method Post -UseBasicParsing
 } Catch {
-   Write-Error "Error invoking web request"
+   Write-Error "Error invoking web request at Start"
 }
 
 Try {
     $authResult = ConvertFrom-Json($jsonResult.Content)
     $accessToken = $authResult.access_token
-} Catch {
+}catch{
     Write-Error "Error authentication result"
 }
 #endregion
@@ -147,7 +146,7 @@ function getOrgaRepos($link){
 
         #write-host $jsonResult -ForegroundColor red
         $repository = $jsonResult | ConvertFrom-Json
-        if(($ignoreDefRepo -eq $true) -and ($repository.name -eq 'Default Backup Repository')){
+        if(($ignoreDefRepo -eq 'true') -and ($repository.name -eq 'Default Backup Repository')){
             #write-host "ignore def repo" -ForegroundColor Green
             #write-host $repository.name
         }else{
@@ -422,7 +421,7 @@ ForEach ($repository in $vboRepositories) {
                 "<showTable>1</showTable>"
                 "</result>"
 
-    $channel = "Repository - " + $repository.Name + " - Used %"
+    $channel = "Repository - " + $repository.Name + " - Used Percent"
     $value = 100 / $repository.Capacity * ($repository.Capacity - $repository.Free)
     Write-Host "<result>"
                 "<channel>$channel</channel>"
