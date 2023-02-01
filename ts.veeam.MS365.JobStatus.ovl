@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValueLookup id="ts.veeam.MS365.JobStatus" desiredValue="0" undefinedState="Error">
+  <Lookups>
+    <SingleInt state="Ok" value="0">success</SingleInt>
+    <SingleInt state="Warning" value="1">Warning</SingleInt>
+    <SingleInt state="Error" value="2">Failed</SingleInt>
+    <SingleInt state="Error" value="3">unknown</SingleInt>
+  </Lookups>
+</ValueLookup>
