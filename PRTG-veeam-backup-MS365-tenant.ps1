@@ -25,19 +25,26 @@
     .TODO
     - Create Lookup OVL
 
+    .NOTES
+    2023-03-16 - Line 157: replacing v7 with v6 - API does not support v7 jobSessions atm.
+
  #>
 
-
-
-param (
+ param (
     [string]$apiUrl = $(throw "<prtg><error>1</error><text>-apiUrl is missing in parameters</text></prtg>"),
     [string]$username = $(throw "<prtg><error>1</error><text>-username is missing in parameters</text></prtg>"),
     [string]$password = $(throw "<prtg><error>1</error><text>-password is missing in parameters</text></prtg>"),
     [string]$orgName = $(throw "<prtg><error>1</error><text>-orgName is missing in parameters</text></prtg>"),
-    [string]$ignoreDefRepo = $(throw "<prtg><error>1</error><text>-ignoreDefRepo is missing in parameters</text></prtg>"),
-    [string]$ignoreSSL = $(throw "<prtg><error>1</error><text>-ignoreSSL is missing in parameters</text></prtg>")
+    #[string]$ignoreDefRepo = $(throw "<prtg><error>1</error><text>-ignoreDefRepo is missing in parameters</text></prtg>"),
+    [string]$ignoreSSL = $(throw "<prtg><error>1</error><text>-ignoreSSL is missing in parameters</text></prtg>"),
+    [boolean]$debug = $false
 )
 
+if($debug){
+    write-host "*******************" -ForegroundColor Red
+    write-host "!!! DEBUG MODE !!! " -ForegroundColor Red
+    write-host "*******************" -ForegroundColor Red
+}
 
 if($ignoreSSL -eq 'true'){
 add-type @"
@@ -50,17 +57,16 @@ add-type @"
             WebRequest request, int certificateProblem) {
                 return true;
             }
-       }
+        }
 "@
-[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+
+    [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
 }
 
 $vboJobs = @()
-$vboRepositories = @()
-$vboProxies = @()
 
 #region: Authenticate
-$url = '/v6/Token'
+$url = '/v7/Token'
 $body = @{
     "username" = $username;
     "password" = $password;
@@ -73,7 +79,7 @@ $headers = @{
 try {
     $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Body $body -Headers $headers -Method Post -UseBasicParsing
 } Catch {
-   Write-Error "Error invoking web request at Start"
+    Write-Error "Error invoking web request at Start"
 }
 
 Try {
@@ -84,153 +90,143 @@ Try {
 }
 #endregion
 
-
-function getOrgaForJob($url){
-    <#
-        function to get job organization for job _links.organization
-    #>
+function getAllOrgLinks($orgName){
+    if($debug){write-host "START - getAllOrgLins" -ForegroundColor Cyan}
+    $url = '/v7/Organizations'
+    
     $headers = @{
         "Content-Type"= "multipart/form-data";
         "Authorization" = "Bearer $accessToken";
     }
     $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
-
+    if($debug){
+        Write-Host ConvertFrom-Json($jsonResult.Content) -ForegroundColor Yellow
+    }
+    
     Try {
-        $orgs = ConvertFrom-Json($jsonResult.Content)
+        $orgas = ConvertFrom-Json($jsonResult.Content)
     } Catch {
-        Write-Error "Error in organization result"
+        Write-Error "Error in result getAllOrgLinks"
+        Exit 1
+    }
+    
+    $orgas = $jsonResult | ConvertFrom-Json
+
+    if($orgName -in $orgas.name){
+        if($debug){write-host "FOUND $orgName in orglist" -ForegroundColor Red}
+
+        #get matching node
+        $org = $orgas | Where-Object {$_.name -eq $orgName}
+        
+        #create link list
+        $orgLinks = [PSCustomObject]@{
+            self      = $org._links.self.href
+            jobs      = $org._links.jobs.href
+            usedRepos = $org._links.usedRepositories.href
+        }
+
+        if($debug){write-host "orgLinks:" $orgLinks -ForegroundColor Cyan}
+
+    }else{
+        write-host "NO Match in orgList for $orgName" -ForegroundColor Red
+        if($debug){ write-host "END - getAllOrgLins" -ForegroundColor Cyan }
         Exit 1
     }
 
-    if($jsonResult.Count -ne 1){
-        Write-Error "More then one organization in result"
-        Exit 1
-    }
+    if($debug){ write-host "END - getAllOrgLins" -ForegroundColor Cyan } 
 
-    $organizations = $jsonResult | ConvertFrom-Json
-    return $organizations.name
+    return $orgLinks    
 }
 
+function getOrgJobsDetails($link){
+    if($debug){write-host "START - getOrgJobsDetails" -ForegroundColor Cyan}
+    if($debug){write-host "*** Jobs link" $link -ForegroundColor Green}
+    $url = $link
 
-function getOrgaRepos($link){
-    $url = $link + '/UsedRepositories'
     $headers = @{
         "Content-Type"= "multipart/form-data";
         "Authorization" = "Bearer $accessToken";
     }
     $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
+    if($debug){Write-Host ConvertFrom-Json($jsonResult.Content) -ForegroundColor Cyan}
 
     Try {
-        $repos = ConvertFrom-Json($jsonResult.Content)
+        $jobs = ConvertFrom-Json($jsonResult.Content)
     } Catch {
-        Write-Error "Error in jobs result"
+        Write-Error "Error in result getOrgJobsLinks"
         Exit 1
-    }
-
-    $repos = $jsonResult | ConvertFrom-Json
-    $tenantRepos = @()
+    }  
     
-    ForEach ($result in $repos.results){
-        $url = $result._links.backupRepository.href
-        $headers = @{
-            "Content-Type"= "multipart/form-data";
-            "Authorization" = "Bearer $accessToken";
-        }
-        $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
-
-        Try {
-            $repositories = ConvertFrom-Json($jsonResult.Content)
-        } Catch {
-            Write-Error "Error in repositories result"
-        }
-
-        #write-host $jsonResult -ForegroundColor red
-        $repository = $jsonResult | ConvertFrom-Json
-        if(($ignoreDefRepo -eq 'true') -and ($repository.name -eq 'Default Backup Repository')){
-            #write-host "ignore def repo" -ForegroundColor Green
-            #write-host $repository.name
-        }else{
-            #write-host "do not ignore def repo" -ForegroundColor Green
-            #write-host $repository.name
-            $myObj = "" | Select Name, Capacity, Free
-			            $myObj.Name = $repository.name
-                        $myObj.Capacity = $repository.capacityBytes
-                        $myObj.Free = $repository.freeSpaceBytes
-        }
-
-        $tenantRepos += $myObj
+    $orgJobLinks = @()
+    $jobs = $jsonResult | ConvertFrom-Json
+    if($debug){write-host "JOBS:" $jobs -ForegroundColor yellow}
+    foreach($job in $jobs){   
+        $v6SessionsLink = $job._links.jobsessions.href -replace '/v7/', '/v6/'
+        $v6SessionsLink = $v6SessionsLink.ToString()
+        getOrgJobSessionDetails $v6SessionsLink $job.id
+        #write-host "********************"
+        #write-host "name: "       $job.name
+        #write-host "id:"          $job.id
+        #write-host "link: "       $job._links.jobsessions.href
+        #write-host "lastRun: "    $job.lastRun
+        #write-host "lastStatus: " $job.lastStatus
     }
+    if($debug){ write-host "END - getOrgJobsDetails" -ForegroundColor Cyan }
 
     
-    return $tenantRepos
 }
 
+function getOrgJobSessionDetails(){
+    Param(
+        [Parameter(Mandatory = $true)] $link,
+        [Parameter(Mandatory = $false)] [string] $id
+    )
+    if($debug){write-host "START - getOrgJobSessionDetails" -ForegroundColor Cyan}
+    if($debug){
+        write-host "*** Job Detials" $link
+        write-host "jobID:" $id
+    }
+    
+    
+    $url = $link
+    
+    $headers = @{
+        "Content-Type"= "multipart/form-data";
+        "Authorization" = "Bearer $accessToken";
+    }
 
-#region: Get VBO Jobs
-$url = '/v6/Jobs?limit=1000000'
-$headers = @{
-    "Content-Type"= "multipart/form-data";
-    "Authorization" = "Bearer $accessToken";
-}
-$jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
+    $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
+    
+    if($debug){Write-Host ConvertFrom-Json($jsonResult.Content) -ForegroundColor yellow}
 
-Try {
-    $jobs = ConvertFrom-Json($jsonResult.Content)
-} Catch {
-    Write-Error "Error in jobs result"
+    Try {
+        $sessions = (ConvertFrom-Json($jsonResult.Content)).results
+    } Catch {
+        Write-Error "Error in result getOrgJobSessionDetails"
+        Exit 1
+    }  
+
+    # Skip session currently active or user aborted, get last known run status
+    if ($sessions[0].status.ToLower() -in @('running', 'queued', 'stopped')) {
+        $session = $sessions[1]
+    } else {
+        $session = $sessions[0]
+    } 
+
+    # Log Items
+    $url = '/v6/JobSessions/' + $session.id + '/LogItems?limit=1000000'
+    $headers = @{
+        "Content-Type"= "multipart/form-data";
+        "Authorization" = "Bearer $accessToken";
+    }
+    $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
+    
+    Try {
+        $logItems = (ConvertFrom-Json($jsonResult.Content)).results
+    } Catch {
+        Write-Error "Error in logitems result"
     Exit 1
-}
-
-#endregion
-
-
-#region: Loop jobs and process session results
-ForEach ($job in $jobs) {
-    # Sessions
-    $jobOrgLink = $job._links.organization.href
-    $jobOrgName = getOrgaForJob($jobOrgLink)
-
-    
-    if($jobOrgName -eq $orgName){
-        #write-host "all OK" -ForegroundColor Green
-
-        $url = '/v6/Jobs/' + $job.id + '/JobSessions'
-        $headers = @{
-            "Content-Type"= "multipart/form-data";
-            "Authorization" = "Bearer $accessToken";
-        }
-        $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
-
-    
-        Try {
-            $sessions = (ConvertFrom-Json($jsonResult.Content)).results
-        } Catch {
-            Write-Error "Error in jobsession result"
-	    Exit 1
-        }
-
-        # Skip session currently active or user aborted, get last known run status
-        if ($sessions[0].status.ToLower() -in @('running', 'queued', 'stopped')) {
-            $session = $sessions[1]
-        } else {
-            $session = $sessions[0]
-        }
-
-        # Log items
-        $url = '/v6/JobSessions/' + $session.id + '/LogItems?limit=1000000'
-        $headers = @{
-            "Content-Type"= "multipart/form-data";
-            "Authorization" = "Bearer $accessToken";
-        }
-        $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
-
-        Try {
-            $logItems = (ConvertFrom-Json($jsonResult.Content)).results
-        } Catch {
-            Write-Error "Error in logitems result"
-	    Exit 1
-        }
-
+    }    
         # Log items to object
         ForEach ($logItem in $logItems) {
             $sCnt = 0;$wCnt = 0;$fCnt = 0
@@ -262,50 +258,96 @@ ForEach ($job in $jobs) {
                     $myObj.Failed = $fCnt
 
         $vboJobs += $myObj
-    }else{
-        #skip this job
-        #write-host "not OK" -ForegroundColor Red
+
+        if($debug){write-host $vboJobs -ForegroundColor green}
+        if($debug){write-host "END - getOrgJobSessionDetails" -ForegroundColor Cyan}
+        return $vboJobs
+}
+
+function getOrgRepoLinks($link){
+    if($debug){write-host "START - getOrgRepoLinks" -ForegroundColor Cyan}
+    $url = $link
+
+    $headers = @{
+        "Content-Type"= "multipart/form-data";
+        "Authorization" = "Bearer $accessToken";
     }
+    $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
+    #Write-Host ConvertFrom-Json($jsonResult.Content) -ForegroundColor Cyan
+
+    Try {
+        $repos = ConvertFrom-Json($jsonResult.Content)
+    } Catch {
+        Write-Error "Error in result getOrgRepoLinks"
+        Exit 1
+    }    
+
+    $orgRepoLinks = @()
+    $repos = $jsonResult | ConvertFrom-Json
+    foreach ($repoLink in $repos.results._links.backupRepository.href){
+        $orgRepoLinks += $repoLink
+    }
+
+    if($debug){write-host "END - getOrgRepoLinks" -ForegroundColor Cyan}
+    return $orgRepoLinks
 }
 
+function getOrgRepoDetails($orgRepoLink){
+    if($debug){write-host "START - getOrgRepoDetails" -ForegroundColor Cyan}
+    #write-host "*** ORG REPO LINK" $orgRepoLink -ForegroundColor Green
+    $url = $orgRepoLink
 
-#region: VBO Repositories
-$vboRepositories = getOrgaRepos($jobOrgLink)
-#endregion
+    $headers = @{ "Content-Type"= "multipart/form-data"; "Authorization" = "Bearer $accessToken"; }
+    $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
 
+    if($debug){Write-Host ConvertFrom-Json($jsonResult.Content) -ForegroundColor Cyan}
 
+    Try {
+        $repos = ConvertFrom-Json($jsonResult.Content)
+    } Catch {
+        Write-Error "Error in result getOrgRepoDetails"
+        Exit 1
+    }        
 
-
-<#
-#region: VBO Proxies
-$url = '/v6/Proxies'
-$headers = @{
-    "Content-Type"= "multipart/form-data";
-    "Authorization" = "Bearer $accessToken";
-}
-$jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
-
-Try {
-    $proxies = ConvertFrom-Json($jsonResult.Content)
-} Catch {
-    Write-Error "Error in proxies result"
-    Exit 1
-}
-
-ForEach ($proxy in $proxies) {
-    $myObj = "" | Select Name, Status
-			    $myObj.Name = $proxy.hostName
-                $myObj.Status = $proxy.status
+    $orgRepoDetails = $jsonResult | ConvertFrom-Json
     
-    $vboProxies += $myObj
+    if($orgRepoDetails.name -ne 'Default Backup Repository'){
+        $myObj = "" | Select Name, Capacity, Free
+        $myObj.Name = $orgRepoDetails.name
+        $myObj.Capacity = $orgRepoDetails.capacityBytes
+        $myObj.Free = $orgRepoDetails.freeSpaceBytes
+    }
+
+    $repo += $myObj
+    
+    if($debug){write-host "END - getOrgRepoDetails" -ForegroundColor Cyan}
+    return $repo
 }
-#endregion
-#>
+
+$orgLinks = getAllOrgLinks($orgName)
+
+$orgJobsDetails = getOrgJobsDetails($orgLinks.jobs)
+if($debug){
+    write-host "*** JOBS ***" -ForegroundColor Green -NoNewline
+    $orgJobsDetails | ft
+}
+
+
+$orgRepoLinks = getOrgRepoLinks($orgLinks.usedRepos)
+$orgRepoDetails = @()
+foreach($orgRepoLink in $orgRepoLinks){
+    $orgRepoDetails += getOrgRepoDetails($orgRepoLink)
+}
+if($debug){
+    write-host "*** REPOS ****" -ForegroundColor Green -NoNewline
+    $orgRepoDetails | ft
+}
+
 
 #region: Jobs to PRTG results
 Write-Host "<prtg>"
-ForEach ($job in $vboJobs) {
-    $channel = "Job - " + $job.Jobname + " - Status"
+ForEach ($job in $orgJobsDetails){
+    $channel = "Job: " + $job.Jobname + " | Status"
     $value = $job.Status
     Write-Host "<result>"
                 "<channel>$channel</channel>"
@@ -317,8 +359,8 @@ ForEach ($job in $vboJobs) {
                 "<LimitMaxError>2</LimitMaxError>"
                 "<LimitMode>1</LimitMode>"
                 "</result>"
-    
-    $channel = "Job - " + $job.Jobname + " - Runtime"
+
+    $channel = "Job: " + $job.Jobname + " | Runtime"
     $value = [math]::Round(($job.end - $job.start).TotalSeconds)
     Write-Host "<result>"
                 "<channel>$channel</channel>"
@@ -326,9 +368,9 @@ ForEach ($job in $vboJobs) {
                 "<unit>TimeSeconds</unit>"
                 "<showChart>1</showChart>"
                 "<showTable>1</showTable>"
-                "</result>"
+                "</result>"    
 
-    $channel = "Job - " + $job.Jobname + " - Transferred"
+    $channel = "Job: " + $job.Jobname + " | Transferred"
     $value = [long]$job.Transferred
     Write-Host "<result>"
                 "<channel>$channel</channel>"
@@ -340,9 +382,9 @@ ForEach ($job in $vboJobs) {
                 "<LimitMinWarning>20971520</LimitMinWarning>"
                 "<LimitMinError>10485760</LimitMinError>"
                 "<LimitMode>1</LimitMode>"
-                "</result>"
+                "</result>"            
 
-    $channel = "Job - " + $job.Jobname + " - Success"
+   $channel = "Job: " + $job.Jobname + " | Success"
     $value = $job.Success
     Write-Host "<result>"
                 "<channel>$channel</channel>"
@@ -353,7 +395,7 @@ ForEach ($job in $vboJobs) {
                 "<showTable>1</showTable>"
                 "</result>"
 
-    $channel = "Job - " + $job.Jobname + " - Warning"
+    $channel = "Job: " + $job.Jobname + " | Warning"
     $value = $job.Warning
     Write-Host "<result>"
                 "<channel>$channel</channel>"
@@ -367,7 +409,7 @@ ForEach ($job in $vboJobs) {
                 "<LimitMode>1</LimitMode>"
                 "</result>"
 
-    $channel = "Job - " + $job.Jobname + " - Failed"
+    $channel = "Job: " + $job.Jobname + " | Failed"
     $value = $job.Failed
     Write-Host "<result>"
                 "<channel>$channel</channel>"
@@ -381,80 +423,66 @@ ForEach ($job in $vboJobs) {
                 "<LimitMode>1</LimitMode>"
                 "</result>"
 }
-
-
-#region: VBO Reposities to PRTG results
-ForEach ($repository in $vboRepositories) {
-    $channel = "Repository - " + $repository.Name + " - Capacity"
-    $value = $repository.Capacity
-    Write-Host "<result>"
-                "<channel>$channel</channel>"
-                "<value>$value</value>"
-                "<unit>BytesDisk</unit>"
-                "<VolumeSize>GigaByte</VolumeSize>"
-                "<showChart>1</showChart>"
-                "<showTable>1</showTable>"
-                "</result>"
-    
-    $channel = "Repository - " + $repository.Name + " - Free"
-    $value = $repository.Free
-    Write-Host "<result>"
-                "<channel>$channel</channel>"
-                "<value>$value</value>"
-                "<unit>BytesDisk</unit>"
-                "<VolumeSize>GigaByte</VolumeSize>"
-                "<showChart>1</showChart>"
-                "<showTable>1</showTable>"
-                "<LimitMinWarning>1073741824</LimitMinWarning>"
-                "<LimitMinError>536870912</LimitMinError>"
-                "<LimitMode>1</LimitMode>"
-                "</result>"
-    
-    $channel = "Repository - " + $repository.Name + " - Used"
-    $value = $repository.Capacity - $repository.Free
-    Write-Host "<result>"
-                "<channel>$channel</channel>"
-                "<value>$value</value>"
-                "<unit>BytesDisk</unit>"
-                "<VolumeSize>GigaByte</VolumeSize>"
-                "<showChart>1</showChart>"
-                "<showTable>1</showTable>"
-                "</result>"
-
-    $channel = "Repository - " + $repository.Name + " - Used Percent"
-    $value = 100 / $repository.Capacity * ($repository.Capacity - $repository.Free)
-    Write-Host "<result>"
-                "<channel>$channel</channel>"
-                "<value>$value</value>"
-                "<unit>Percent</unit>"
-                "<float>1</float>"
-                "<decimalMode>All</decimalMode>"
-                "<LimitMaxWarning>80</LimitMaxWarning>"
-                "<LimitMaxError>90</LimitMaxError>"
-                "<LimitMode>1</LimitMode>"
-                "<showChart>1</showChart>"
-                "<showTable>1</showTable>"
-                "</result>"
-}
 #endregion
 
-<#
-#region: VBO Proxies to PRTG results
-if($listProxy){
-    ForEach ($proxy in $vboProxies) {
-        $channel = "Proxy - " + $proxy.Name + " - Status"
-        $value = [int]($proxy.Status -like "*Online*")
+#region: Repositories to PRTG results
+ForEach ($repository in $orgRepoDetails) {
+    #$reponame = $repository.name
+    #write-host "Repo name: '$reponame'" -ForegroundColor red
+
+    if($repository.name){
+        $channel = "Repository: " + $repository.Name + " | Capacity"
+        $value = $repository.Capacity
         Write-Host "<result>"
-                   "<channel>$channel</channel>"
-                   "<value>$value</value>"
-                   "<customunit>Status</customunit>"
-                   "<showChart>1</showChart>"
-                   "<showTable>1</showTable>"
-                   "<LimitMinError>0</LimitMinError>"
-                   "<LimitMode>1</LimitMode>"
-                   "</result>"
+                    "<channel>$channel</channel>"
+                    "<value>$value</value>"
+                    "<unit>BytesDisk</unit>"
+                    "<VolumeSize>GigaByte</VolumeSize>"
+                    "<showChart>1</showChart>"
+                    "<showTable>1</showTable>"
+                    "</result>"    
+
+        $channel = "Repository: " + $repository.Name + " | Free"
+        $value = $repository.Free
+        Write-Host "<result>"
+                    "<channel>$channel</channel>"
+                    "<value>$value</value>"
+                    "<unit>BytesDisk</unit>"
+                    "<VolumeSize>GigaByte</VolumeSize>"
+                    "<showChart>1</showChart>"
+                    "<showTable>1</showTable>"
+                    "<LimitMinWarning>1073741824</LimitMinWarning>"
+                    "<LimitMinError>536870912</LimitMinError>"
+                    "<LimitMode>1</LimitMode>"
+                    "</result>"
+
+        $channel = "Repository: " + $repository.Name + " | Used"
+        $value = $repository.Capacity - $repository.Free
+        Write-Host "<result>"
+                    "<channel>$channel</channel>"
+                    "<value>$value</value>"
+                    "<unit>BytesDisk</unit>"
+                    "<VolumeSize>GigaByte</VolumeSize>"
+                    "<showChart>1</showChart>"
+                    "<showTable>1</showTable>"
+                    "</result>"   
+
+        $channel = "Repository: " + $repository.Name + " | Used Percent"
+        $value = 100 / $repository.Capacity * ($repository.Capacity - $repository.Free)
+        Write-Host "<result>"
+                    "<channel>$channel</channel>"
+                    "<value>$value</value>"
+                    "<unit>Percent</unit>"
+                    "<float>1</float>"
+                    "<decimalMode>All</decimalMode>"
+                    "<LimitMaxWarning>80</LimitMaxWarning>"
+                    "<LimitMaxError>90</LimitMaxError>"
+                    "<LimitMode>1</LimitMode>"
+                    "<showChart>1</showChart>"
+                    "<showTable>1</showTable>"
+                    "</result>"                            
     }
 }
 #endregion
-#>
+
 Write-Host "</prtg>"
