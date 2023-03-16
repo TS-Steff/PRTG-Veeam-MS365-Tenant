@@ -220,7 +220,10 @@ function getOrgJobSessionDetails(){
         "Authorization" = "Bearer $accessToken";
     }
     $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
-    
+    if($debug){
+        write-host "JOB:" $job -ForegroundColor Blue
+    }
+
     Try {
         $logItems = (ConvertFrom-Json($jsonResult.Content)).results
     } Catch {
@@ -247,7 +250,7 @@ function getOrgJobSessionDetails(){
         # Thank you Veeam for fixing this!
         $transferred = $session.statistics.transferredDataBytes
 
-        $myObj = "" | Select Jobname, Status, Start, End, Transferred, Success, Warning, Failed
+        $myObj = "" | Select Jobname, Status, Start, End, Transferred, Success, Warning, Failed, LastRun
 			        $myObj.Jobname = $job.name
                     $myObj.Status = $jobStatus
                     $myObj.Start = Get-Date($session.creationTime)
@@ -256,6 +259,7 @@ function getOrgJobSessionDetails(){
                     $myObj.Success = $sCnt
                     $myObj.Warning = $wCnt
                     $myObj.Failed = $fCnt
+                    $myObj.LastRun = $job.lastRun
 
         $vboJobs += $myObj
 
@@ -484,5 +488,5 @@ ForEach ($repository in $orgRepoDetails) {
     }
 }
 #endregion
-
+Write-Host "<text>LastRun:" $job.LastRun"</text>"
 Write-Host "</prtg>"
