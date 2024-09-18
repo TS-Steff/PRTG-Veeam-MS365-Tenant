@@ -27,6 +27,7 @@
 
     .NOTES
     2023-03-16 - Line 157: replacing v7 with v6 - API does not support v7 jobSessions atm.
+    2024-09-16 - Update to Veeam MS365 Backup 8.x
 
  #>
 
@@ -66,14 +67,15 @@ add-type @"
 $vboJobs = @()
 
 #region: Authenticate
-$url = '/v7/Token'
+$url = '/v8/token'
 $body = @{
     "username" = $username;
     "password" = $password;
     "grant_type" = "password";
+    "disable_antiforgery_token"="true";
 }
 $headers = @{
-    "Content-Type"= "multipart/form-data"
+    "Content-Type"= "application/x-www-form-urlencoded"
 }
 
 try {
@@ -88,36 +90,61 @@ Try {
 }catch{
     Write-Error "Error authentication result"
 }
+if($debug){write-host "jsonResult:" $authResult -ForegroundColor Cyan}
+if($debug){write-host "acces Token:" $accessToken -ForegroundColor Cyan}
 #endregion
 
 function getAllOrgLinks($orgName){
-    if($debug){write-host "START - getAllOrgLins" -ForegroundColor Cyan}
-    $url = '/v7/Organizations'
+    if($debug){write-host "START - getAllOrgLinks" -ForegroundColor Cyan}
+    $url = '/v8/Organizations?limit=100' # default limit is set to 30
+    if($debug){write-host "OrgName:" $orgName -ForegroundColor green}
     
     $headers = @{
-        "Content-Type"= "multipart/form-data";
+        "accept"= "application/json";
         "Authorization" = "Bearer $accessToken";
+        
     }
-    $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
+
     if($debug){
-        Write-Host ConvertFrom-Json($jsonResult.Content) -ForegroundColor Yellow
+        write-host $apiUrl$url -ForegroundColor green
+    }   
+    #$jsonResult = Invoke-RestMethod -Uri $apiUrl$url -Method Get -Headers $headers -UseBasicParsing -ErrorVariable RespErr;
+    
+    try{
+        $jsonResultOrg = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
+    }catch{
+        $StatusCode = $_.Exception.Response.StatusCode
+
+        write-host "status: " $StatusCode
+        write-host "status: " $([int]$StatusCode)
     }
     
+    if($debug){ write-host $RespErr }
+    if($debug){ Write-Host ConvertFrom-Json($jsonResultOrg.Content) -ForegroundColor Yellow }
+    
     Try {
-        $orgas = ConvertFrom-Json($jsonResult.Content)
+        $orgas = ConvertFrom-Json($jsonResultOrg.Content)
     } Catch {
         Write-Error "Error in result getAllOrgLinks"
         Exit 1
     }
+  
+    $orgas = $jsonResultOrg | ConvertFrom-Json
     
-    $orgas = $jsonResult | ConvertFrom-Json
+    if($debug){
+        foreach($orga in $orgas.results){
+            write-host $orga.name -ForegroundColor Green
+        }
+    }
 
-    if($orgName -in $orgas.name){
+    if($orgName -in $orgas.results.name){
         if($debug){write-host "FOUND $orgName in orglist" -ForegroundColor Red}
 
         #get matching node
-        $org = $orgas | Where-Object {$_.name -eq $orgName}
+        $org = $orgas | Where-Object {$_.results.name -eq $orgName}
         
+        write-host $orgas.results -ForegroundColor Blue
+
         #create link list
         $orgLinks = [PSCustomObject]@{
             self      = $org._links.self.href
@@ -129,11 +156,11 @@ function getAllOrgLinks($orgName){
 
     }else{
         write-host "NO Match in orgList for $orgName" -ForegroundColor Red
-        if($debug){ write-host "END - getAllOrgLins" -ForegroundColor Cyan }
+        if($debug){ write-host "END - getAllOrgLinks" -ForegroundColor Cyan }
         Exit 1
     }
 
-    if($debug){ write-host "END - getAllOrgLins" -ForegroundColor Cyan } 
+    if($debug){ write-host "END - getAllOrgLinks" -ForegroundColor Cyan } 
 
     return $orgLinks    
 }
