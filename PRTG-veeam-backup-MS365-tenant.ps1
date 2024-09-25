@@ -95,10 +95,13 @@ Try {
 #endregion
 
 function getAllOrgLinks($orgName){
-    if($debug){write-host "START - getAllOrgLinks" -ForegroundColor Cyan}
+    if($debug){
+        write-host "START - getAllOrgLinks" -ForegroundColor Cyan
+        write-host "OrgName:" $orgName -ForegroundColor green
+    }
+
     $url = '/v8/Organizations?limit=100' # default limit is set to 30
-    if($debug){write-host "OrgName:" $orgName -ForegroundColor green}
-    
+
     $headers = @{
         "accept"= "application/json";
         "Authorization" = "Bearer $accessToken";
@@ -146,11 +149,15 @@ function getAllOrgLinks($orgName){
 
     if($orgName -in $allOrgNames){
         if($debug){write-host "!!! FOUND $orgName in orglist" -ForegroundColor Red}
+            
 
         # Get org data
         $org = $orgsResults | Where-Object { $_.name -eq $orgName}
 
-        if($debug){ write-host $org -ForegroundColor Cyan}
+        if($debug){ 
+            write-host $org -ForegroundColor Cyan
+            Write-host "OrgID: " $org.id -ForegroundColor Red
+        }
 
         #create link list
         $orgLinks = [PSCustomObject]@{
@@ -173,14 +180,31 @@ function getAllOrgLinks($orgName){
 
 function getOrgJobsDetails($link){
     if($debug){write-host "START - getOrgJobsDetails" -ForegroundColor Cyan}
-    if($debug){write-host "*** Jobs link" $link -ForegroundColor Green}
-    $url = $link
+    #if($debug){write-host "*** Jobs link" $link -ForegroundColor Green}
+    $orgID = "071a375c-8334-478a-bc69-c904264e53b6"
+    
+    #$url = $link
+    #https://localhost:4443/v8/Jobs?organizationId=497f6eca-6276-4993-bfeb-53cbbbba6f08&repositoryId=497f6eca-6276-4993-bfeb-53cbbbba6f08&limit=0&offset=0'
+    $url = "/v8/Jobs?organizationId=$orgID"
+
+    if($debug){write-host $apiUrl$url -ForegroundColor RED}
 
     $headers = @{
-        "Content-Type"= "multipart/form-data";
+        "Content-Type"= "application/json";
         "Authorization" = "Bearer $accessToken";
     }
-    $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
+
+    try{
+        $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
+    }catch{
+        $StatusCode = $_.Exception.Response.StatusCode
+
+        write-host "status: " $StatusCode
+        write-host "status: " $([int]$StatusCode)
+    }
+
+    #$jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
+
     if($debug){Write-Host ConvertFrom-Json($jsonResult.Content) -ForegroundColor Cyan}
 
     Try {
@@ -189,80 +213,135 @@ function getOrgJobsDetails($link){
         Write-Error "Error in result getOrgJobsLinks"
         Exit 1
     }  
+
+    # Convert JSON to PS obj
+    $jobs = $jsonResult | ConvertFrom-Json
+    
+    # access results
+    $jobs = $jobs.results
     
     $orgJobLinks = @()
-    $jobs = $jsonResult | ConvertFrom-Json
+    
     if($debug){write-host "JOBS:" $jobs -ForegroundColor yellow}
     foreach($job in $jobs){   
-        $v6SessionsLink = $job._links.jobsessions.href -replace '/v7/', '/v6/'
-        $v6SessionsLink = $v6SessionsLink.ToString()
-        getOrgJobSessionDetails $v6SessionsLink $job.id
-        #write-host "********************"
-        #write-host "name: "       $job.name
-        #write-host "id:"          $job.id
-        #write-host "link: "       $job._links.jobsessions.href
-        #write-host "lastRun: "    $job.lastRun
-        #write-host "lastStatus: " $job.lastStatus
+        #$v6SessionsLink = $job._links.jobsessions.href -replace '/v8/', '/v6/'
+        #$v6SessionsLink = $v6SessionsLink.ToString()
+        getOrgJobSessionDetails $job.id $job._links.jobsessions.href
+        #getOrgJobSessionDetails $v6SessionsLink $job.id
+        #getOrgJobSessionDetails $v6SessionsLink $job.id
+        if($debug){
+            write-host "********************"
+            write-host "name: "       $job.name
+            write-host "id:"          $job.id
+            write-host "link: "       $job._links.jobsessions.href
+            write-host "lastRun: "    $job.lastRun
+            write-host "lastStatus: " $job.lastStatus
+        }
     }
     if($debug){ write-host "END - getOrgJobsDetails" -ForegroundColor Cyan }
-
-    
 }
 
 function getOrgJobSessionDetails(){
     Param(
-        [Parameter(Mandatory = $true)] $link,
-        [Parameter(Mandatory = $false)] [string] $id
+        [Parameter(Mandatory = $true)] [string] $id,
+        [Parameter(Mandatory = $false)] $link
+        
     )
-    if($debug){write-host "START - getOrgJobSessionDetails" -ForegroundColor Cyan}
+        
     if($debug){
+        write-host "START - getOrgJobSessionDetails" -ForegroundColor Cyan
         write-host "*** Job Detials" $link
         write-host "jobID:" $id
     }
     
-    
-    $url = $link
+
+    $url = "/v8/JobSessions?JobId=$id&limit=2&offset=0"
     
     $headers = @{
-        "Content-Type"= "multipart/form-data";
+        "Content-Type"= "application/json";
         "Authorization" = "Bearer $accessToken";
     }
 
-    $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
-    
-    if($debug){Write-Host ConvertFrom-Json($jsonResult.Content) -ForegroundColor yellow}
+    write-host $apiUrl$url 
 
+    try{
+        $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
+    }catch{
+        $StatusCode = $_.Exception.Response.StatusCode
+
+        write-host "status: " $StatusCode
+        write-host "status: " $([int]$StatusCode)
+    }    
+
+    # convert JSON to PS object
+    $objResults = $jsonResult | ConvertFrom-Json
+
+    $jobResults = $objResults.results
+    #$jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
+    
+    if($debug){Write-Host $jobResults -ForegroundColor yellow}
+    
+    <#
     Try {
         $sessions = (ConvertFrom-Json($jsonResult.Content)).results
     } Catch {
         Write-Error "Error in result getOrgJobSessionDetails"
         Exit 1
     }  
-
+    #>
+     
     # Skip session currently active or user aborted, get last known run status
-    if ($sessions[0].status.ToLower() -in @('running', 'queued', 'stopped')) {
-        $session = $sessions[1]
+    if ($jobResults[0].status.ToLower() -in @('running', 'queued', 'stopped')) {
+        $session = $jobResults[1]
     } else {
-        $session = $sessions[0]
+        $session = $jobResults[0]
     } 
 
+ 
+    <#
     # Log Items
-    $url = '/v6/JobSessions/' + $session.id + '/LogItems?limit=1000000'
+    write-host $session.id -BackgroundColor Yellow -ForegroundColor Black
+    $url = '/v8/JobSessions/' + $session.id + '/LogItems?limit=1000000'
+    write-host $url -BackgroundColor Yellow -ForegroundColor Black
     $headers = @{
         "Content-Type"= "multipart/form-data";
         "Authorization" = "Bearer $accessToken";
     }
-    $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
+    
+    try{
+        $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
+    }catch{
+        $StatusCode = $_.Exception.Response.StatusCode
+
+        write-host "status: " $StatusCode
+        write-host "status: " $([int]$StatusCode)
+    } 
+
+    # convert JSON to PS Obj
+    $jobLogObj = $jsonResult | ConvertFrom-Json
+
+    # Access results
+    $jobLogResults = $jobLogObj.results
+
+    write-host $jobLogResults -ForegroundColor Red    
+    
     if($debug){
         write-host "JOB:" $job -ForegroundColor Blue
     }
+
+
+       
+    write-host $jobLogResults -ForegroundColor Red
 
     Try {
         $logItems = (ConvertFrom-Json($jsonResult.Content)).results
     } Catch {
         Write-Error "Error in logitems result"
-    Exit 1
-    }    
+    
+    } 
+
+    write-host $logItems -ForegroundColor Green
+    
         # Log items to object
         ForEach ($logItem in $logItems) {
             $sCnt = 0;$wCnt = 0;$fCnt = 0
@@ -272,7 +351,7 @@ function getOrgJobSessionDetails(){
                    '*failed*' {$fCnt++}
             }
         }
-
+    #>
         Switch -wildcard ($session.status.ToLower()) {
                    '*success*' {$jobStatus = 0}
                    '*warning*' {$jobStatus = 1}
@@ -283,26 +362,30 @@ function getOrgJobSessionDetails(){
         # Thank you Veeam for fixing this!
         $transferred = $session.statistics.transferredDataBytes
 
-        $myObj = "" | Select Jobname, Status, Start, End, Transferred, Success, Warning, Failed, LastRun
+        $myObj = "" | Select Jobname, Status, Start, End, Transferred, LastRun
 			        $myObj.Jobname = $job.name
                     $myObj.Status = $jobStatus
                     $myObj.Start = Get-Date($session.creationTime)
                     $myObj.End = Get-Date($session.endTime)
                     $myObj.Transferred = $transferred
-                    $myObj.Success = $sCnt
-                    $myObj.Warning = $wCnt
-                    $myObj.Failed = $fCnt
+                    #$myObj.Success = $sCnt 
+                    #$myObj.Warning = $wCnt
+                    #$myObj.Failed = $fCnt
                     $myObj.LastRun = $job.lastRun
 
         $vboJobs += $myObj
 
-        if($debug){write-host $vboJobs -ForegroundColor green}
-        if($debug){write-host "END - getOrgJobSessionDetails" -ForegroundColor Cyan}
+        if($debug){
+            write-host $vboJobs -ForegroundColor green
+            write-host "END - getOrgJobSessionDetails" -ForegroundColor Cyan
+        }
+
         return $vboJobs
 }
 
 function getOrgRepoLinks($link){
     if($debug){write-host "START - getOrgRepoLinks" -ForegroundColor Cyan}
+    
     $url = $link
 
     $headers = @{
@@ -420,7 +503,7 @@ ForEach ($job in $orgJobsDetails){
                 "<LimitMinError>10485760</LimitMinError>"
                 "<LimitMode>1</LimitMode>"
                 "</result>"            
-
+<#
    $channel = "Job: " + $job.Jobname + " | Success"
     $value = $job.Success
     Write-Host "<result>"
@@ -459,6 +542,7 @@ ForEach ($job in $orgJobsDetails){
                 "<LimitMaxError>2</LimitMaxError>"
                 "<LimitMode>1</LimitMode>"
                 "</result>"
+#>
 }
 #endregion
 
