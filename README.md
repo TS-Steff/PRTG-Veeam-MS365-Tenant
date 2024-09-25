@@ -28,5 +28,5 @@
  Script for V8. This one does not include the sensors
   - Job: *** | Success
   - Job: *** | Warning
-  - Job: *** | Status
+  - Job: *** | Status  
  These were counters for past backups
