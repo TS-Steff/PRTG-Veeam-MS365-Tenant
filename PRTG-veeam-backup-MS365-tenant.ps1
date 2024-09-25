@@ -90,14 +90,15 @@ Try {
 }catch{
     Write-Error "Error authentication result"
 }
-#if($debug){write-host "jsonResult:" $authResult -ForegroundColor Cyan}
-#if($debug){write-host "acces Token:" $accessToken -ForegroundColor Cyan}
+
+if($debug){write-host "jsonResult:" $authResult -ForegroundColor Green}
+
 #endregion
 
 function getAllOrgLinks($orgName){
     if($debug){
         write-host "START - getAllOrgLinks" -ForegroundColor Cyan
-        write-host "OrgName:" $orgName -ForegroundColor green
+        write-host "OrgName:" $orgName -ForegroundColor Cyan
     }
 
     $url = '/v8/Organizations?limit=100' # default limit is set to 30
@@ -105,13 +106,9 @@ function getAllOrgLinks($orgName){
     $headers = @{
         "accept"= "application/json";
         "Authorization" = "Bearer $accessToken";
-        
     }
 
-    if($debug){
-        write-host $apiUrl$url -ForegroundColor green
-    }   
-    #$jsonResult = Invoke-RestMethod -Uri $apiUrl$url -Method Get -Headers $headers -UseBasicParsing -ErrorVariable RespErr;
+    if($debug){ write-host $apiUrl$url -ForegroundColor Cyan }   
     
     try{
         $jsonResultOrg = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
@@ -121,20 +118,9 @@ function getAllOrgLinks($orgName){
         write-host "status: " $StatusCode
         write-host "status: " $([int]$StatusCode)
     }
-    
-
-    if($debug){ write-host $RespErr }
-    if($debug){ 
-        Write-Host ConvertFrom-Json($jsonResultOrg.Content) -ForegroundColor Yellow 
-    }
-    
-    Try {
-        $orgas = ConvertFrom-Json($jsonResultOrg.Content)
-    } Catch {
-        Write-Error "Error in result getAllOrgLinks"
-        Exit 1
-    }
   
+    if($debug){ Write-Host ConvertFrom-Json($jsonResultOrg.Content) -ForegroundColor Cyan }
+    
     # Convert JSON to a Powershell object
     $orgsObj = $jsonResultOrg | ConvertFrom-Json
     
@@ -149,24 +135,25 @@ function getAllOrgLinks($orgName){
 
     if($orgName -in $allOrgNames){
         if($debug){write-host "!!! FOUND $orgName in orglist" -ForegroundColor Red}
-            
 
         # Get org data
         $org = $orgsResults | Where-Object { $_.name -eq $orgName}
 
         if($debug){ 
             write-host $org -ForegroundColor Cyan
-            Write-host "OrgID: " $org.id -ForegroundColor Red
+            Write-host "OrgID: " $org.id -ForegroundColor Cyan
         }
 
+        # ToDo: Check if all of this elemets are needed
         #create link list
-        $orgLinks = [PSCustomObject]@{
-            self      = $org._links.self.href
-            jobs      = $org._links.jobs.href
-            usedRepos = $org._links.usedRepositories.href
+        $orgInfos = [PSCustomObject]@{
+            orgID       = $org.id                             # needed
+            lSelf       = $org._links.self.href   
+            lJobs       = $org._links.jobs.href
+            lUsedRepos  = $org._links.usedRepositories.href   # used
         }
 
-        if($debug){write-host "orgLinks:" $orgLinks -ForegroundColor Cyan}
+        if($debug){write-host "orgLinks:" $orgInfos -ForegroundColor Cyan}
     }else{
         write-host "NO Match in orgList for $orgName" -ForegroundColor Red
         if($debug){ write-host "END - getAllOrgLinks" -ForegroundColor Cyan }
@@ -175,19 +162,18 @@ function getAllOrgLinks($orgName){
 
     if($debug){ write-host "END - getAllOrgLinks" -ForegroundColor Cyan } 
 
-    return $orgLinks    
+    return $orgInfos    
 }
 
-function getOrgJobsDetails($link){
-    if($debug){write-host "START - getOrgJobsDetails" -ForegroundColor Cyan}
-    #if($debug){write-host "*** Jobs link" $link -ForegroundColor Green}
-    $orgID = "071a375c-8334-478a-bc69-c904264e53b6"
+function getOrgJobsDetails($orgID){
+    if($debug){
+        write-host "START - getOrgJobsDetails" -ForegroundColor Yellow
+        write-host "orgID: " $orgID -ForegroundColor Yellow
+    }
     
-    #$url = $link
-    #https://localhost:4443/v8/Jobs?organizationId=497f6eca-6276-4993-bfeb-53cbbbba6f08&repositoryId=497f6eca-6276-4993-bfeb-53cbbbba6f08&limit=0&offset=0'
     $url = "/v8/Jobs?organizationId=$orgID"
 
-    if($debug){write-host $apiUrl$url -ForegroundColor RED}
+    if($debug){write-host "API URL: " $apiUrl$url -ForegroundColor Yellow}
 
     $headers = @{
         "Content-Type"= "application/json";
@@ -205,7 +191,7 @@ function getOrgJobsDetails($link){
 
     #$jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
 
-    if($debug){Write-Host ConvertFrom-Json($jsonResult.Content) -ForegroundColor Cyan}
+    if($debug){Write-Host ConvertFrom-Json($jsonResult.Content) -ForegroundColor Yellow}
 
     Try {
         $jobs = ConvertFrom-Json($jsonResult.Content)
@@ -220,8 +206,6 @@ function getOrgJobsDetails($link){
     # access results
     $jobs = $jobs.results
     
-    $orgJobLinks = @()
-    
     if($debug){write-host "JOBS:" $jobs -ForegroundColor yellow}
     foreach($job in $jobs){   
         #$v6SessionsLink = $job._links.jobsessions.href -replace '/v8/', '/v6/'
@@ -230,15 +214,15 @@ function getOrgJobsDetails($link){
         #getOrgJobSessionDetails $v6SessionsLink $job.id
         #getOrgJobSessionDetails $v6SessionsLink $job.id
         if($debug){
-            write-host "********************"
-            write-host "name: "       $job.name
-            write-host "id:"          $job.id
-            write-host "link: "       $job._links.jobsessions.href
-            write-host "lastRun: "    $job.lastRun
-            write-host "lastStatus: " $job.lastStatus
+            write-host "************************************************************"    -ForegroundColor Yellow
+            write-host "name:       " $job.name                                          -ForegroundColor Yellow
+            write-host "id:         " $job.id                                            -ForegroundColor Yellow
+            write-host "lastRun:    " $job.lastRun                                       -ForegroundColor Yellow
+            write-host "lastStatus: " $job.lastStatus                                    -ForegroundColor Yellow
+            write-host "************************************************************"    -ForegroundColor Yellow
         }
     }
-    if($debug){ write-host "END - getOrgJobsDetails" -ForegroundColor Cyan }
+    if($debug){ write-host "END - getOrgJobsDetails" -ForegroundColor yellow }
 }
 
 function getOrgJobSessionDetails(){
@@ -249,9 +233,9 @@ function getOrgJobSessionDetails(){
     )
         
     if($debug){
-        write-host "START - getOrgJobSessionDetails" -ForegroundColor Cyan
-        write-host "*** Job Detials" $link
-        write-host "jobID:" $id
+        write-host "START - getOrgJobSessionDetails" -ForegroundColor Green
+        write-host "*** Job Detials" $link -ForegroundColor Green
+        write-host "jobID:" $id -ForegroundColor Green
     }
     
 
@@ -262,7 +246,7 @@ function getOrgJobSessionDetails(){
         "Authorization" = "Bearer $accessToken";
     }
 
-    write-host $apiUrl$url 
+    write-host $apiUrl$url  -ForegroundColor Green
 
     try{
         $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
@@ -279,7 +263,7 @@ function getOrgJobSessionDetails(){
     $jobResults = $objResults.results
     #$jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
     
-    if($debug){Write-Host $jobResults -ForegroundColor yellow}
+    if($debug){Write-Host $jobResults -ForegroundColor Green}
     
     <#
     Try {
@@ -376,8 +360,8 @@ function getOrgJobSessionDetails(){
         $vboJobs += $myObj
 
         if($debug){
-            write-host $vboJobs -ForegroundColor green
-            write-host "END - getOrgJobSessionDetails" -ForegroundColor Cyan
+            write-host $vboJobs -ForegroundColor Green
+            write-host "END - getOrgJobSessionDetails" -ForegroundColor Green
         }
 
         return $vboJobs
@@ -444,16 +428,17 @@ function getOrgRepoDetails($orgRepoLink){
     return $repo
 }
 
-$orgLinks = getAllOrgLinks($orgName)
+$orgInfos = getAllOrgLinks($orgName)
 
-$orgJobsDetails = getOrgJobsDetails($orgLinks.jobs)
+$orgJobsDetails = getOrgJobsDetails($orgInfos.orgID)
+
 if($debug){
     write-host "*** JOBS ***" -ForegroundColor Green -NoNewline
     $orgJobsDetails | ft
 }
 
-
-$orgRepoLinks = getOrgRepoLinks($orgLinks.usedRepos)
+# TODO
+$orgRepoLinks = getOrgRepoLinks($orgInfos.lUsedRepos)
 $orgRepoDetails = @()
 foreach($orgRepoLink in $orgRepoLinks){
     $orgRepoDetails += getOrgRepoDetails($orgRepoLink)
