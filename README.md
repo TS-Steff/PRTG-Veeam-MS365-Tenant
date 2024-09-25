@@ -29,4 +29,5 @@
   - Job: *** | Success
   - Job: *** | Warning
   - Job: *** | Status  
-These were counters for past backups
+
+These were counters for past backups.
