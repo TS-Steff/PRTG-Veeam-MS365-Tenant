@@ -5,7 +5,7 @@
 
 # Compatibility
  PRTG-veeam-backup-MS365-tenants_v7.ps1 is for Veeam MS365 Backup Version 7
- PRTG-veeam-backup-MS365-tenants_v8.ps1 is for Veeam MS365 Backup Version 8 BUT DOES ACTUALLY NOT WORK AND IS IN PROGRESS!!!
+ PRTG-veeam-backup-MS365-tenants.ps1 is for Veeam MS365 Backup Version 8 BUT DOES ACTUALLY NOT WORK AND IS IN PROGRESS!!!
 
 # Original Links
  https://github.com/BasvanH
@@ -22,3 +22,11 @@
     - This way the Windows user defined on the probe is used for authenticating to VBO API, make sure the correct permissions are set in VBO for this user
 - Set preferred timeout and interval
 - I've set some default limits on the channels, change them to your preferred levels
+
+# History
+## 2024-09
+ Script for V8. This one does not include the sensors
+  - Job: *** | Success
+  - Job: *** | Warning
+  - Job: *** | Status
+ These were counters for past backups
