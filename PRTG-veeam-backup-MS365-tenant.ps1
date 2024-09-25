@@ -90,8 +90,8 @@ Try {
 }catch{
     Write-Error "Error authentication result"
 }
-if($debug){write-host "jsonResult:" $authResult -ForegroundColor Cyan}
-if($debug){write-host "acces Token:" $accessToken -ForegroundColor Cyan}
+#if($debug){write-host "jsonResult:" $authResult -ForegroundColor Cyan}
+#if($debug){write-host "acces Token:" $accessToken -ForegroundColor Cyan}
 #endregion
 
 function getAllOrgLinks($orgName){
@@ -119,8 +119,11 @@ function getAllOrgLinks($orgName){
         write-host "status: " $([int]$StatusCode)
     }
     
+
     if($debug){ write-host $RespErr }
-    if($debug){ Write-Host ConvertFrom-Json($jsonResultOrg.Content) -ForegroundColor Yellow }
+    if($debug){ 
+        Write-Host ConvertFrom-Json($jsonResultOrg.Content) -ForegroundColor Yellow 
+    }
     
     Try {
         $orgas = ConvertFrom-Json($jsonResultOrg.Content)
@@ -129,21 +132,25 @@ function getAllOrgLinks($orgName){
         Exit 1
     }
   
-    $orgas = $jsonResultOrg | ConvertFrom-Json
+    # Convert JSON to a Powershell object
+    $orgsObj = $jsonResultOrg | ConvertFrom-Json
     
-    if($debug){
-        foreach($orga in $orgas.results){
-            write-host $orga.name -ForegroundColor Green
-        }
-    }
+    # Access the "restults"
+    $orgsResults = $orgsObj.results
 
-    if($orgName -in $orgas.results.name){
-        if($debug){write-host "FOUND $orgName in orglist" -ForegroundColor Red}
+    # extract all organization names
+    $allOrgNames = $orgsResults.name
 
-        #get matching node
-        $org = $orgas | Where-Object {$_.results.name -eq $orgName}
-        
-        write-host $orgas.results -ForegroundColor Blue
+    # write all orgas down
+    if($debug){ write-host $allOrgNames -ForegroundColor Cyan }
+
+    if($orgName -in $allOrgNames){
+        if($debug){write-host "!!! FOUND $orgName in orglist" -ForegroundColor Red}
+
+        # Get org data
+        $org = $orgsResults | Where-Object { $_.name -eq $orgName}
+
+        if($debug){ write-host $org -ForegroundColor Cyan}
 
         #create link list
         $orgLinks = [PSCustomObject]@{
@@ -153,7 +160,6 @@ function getAllOrgLinks($orgName){
         }
 
         if($debug){write-host "orgLinks:" $orgLinks -ForegroundColor Cyan}
-
     }else{
         write-host "NO Match in orgList for $orgName" -ForegroundColor Red
         if($debug){ write-host "END - getAllOrgLinks" -ForegroundColor Cyan }
