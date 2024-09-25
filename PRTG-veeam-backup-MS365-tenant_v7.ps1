@@ -91,7 +91,7 @@ Try {
 #endregion
 
 function getAllOrgLinks($orgName){
-    if($debug){write-host "START - getAllOrgLins" -ForegroundColor Cyan}
+    if($debug){write-host "START - getAllOrgLinks" -ForegroundColor Cyan}
     $url = '/v7/Organizations'
     
     $headers = @{
@@ -100,7 +100,8 @@ function getAllOrgLinks($orgName){
     }
     $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
     if($debug){
-        Write-Host ConvertFrom-Json($jsonResult.Content) -ForegroundColor Yellow
+        Write-Host $jsonResult
+        Write-Host ConvertFrom-Json($jsonResult) -ForegroundColor Yellow
     }
     
     Try {
