@@ -27,8 +27,8 @@
 
 # History
 ## 2024-10
- Added parameter to return jobs only and ignore repo info.
- fixed repo info
+ - Added parameter to return jobs only and ignore repo info.
+ - fixed repo info
 
 ## 2024-09
  Script for V8. This one does not include the sensors
