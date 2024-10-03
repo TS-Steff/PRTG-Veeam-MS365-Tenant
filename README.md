@@ -34,6 +34,7 @@
 | orgName       | tenant.onmicrosoft.com            | string  | orgname in Veeam for MS365
 | ignoreSSL     | -ignoreSSL "true"                 | string  | skip SSL-Cert validation
 | jobsOnly      | -jobsOnly $true                   | boolean | returns only the job info and skips repo info
+| listOrgs      | -listOrgs $true                   | boolean | DEBUG PARAMETER - skript will only list all orgs on Server
 | debug         | -debug $true                      | boolean | prints out debug info. use in PS!
 
 You may need to wrap string parameters in quotes
