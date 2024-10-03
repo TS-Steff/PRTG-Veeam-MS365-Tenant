@@ -271,7 +271,7 @@ function getOrgJobSessionDetails(){
         "Authorization" = "Bearer $accessToken";
     }
 
-    write-host $apiUrl$url  -ForegroundColor Green
+    if($debug){ write-host $apiUrl$url  -ForegroundColor Green }
 
     try{
         $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
