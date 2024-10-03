@@ -63,6 +63,7 @@
     #[string]$ignoreDefRepo = $(throw "<prtg><error>1</error><text>-ignoreDefRepo is missing in parameters</text></prtg>"),
     [string]$ignoreSSL = $(throw "<prtg><error>1</error><text>-ignoreSSL is missing in parameters</text></prtg>"),
     [boolean]$jobsOnly = $false,
+    [boolean]$listOrgs = $false,
     [boolean]$debug = $false
 )
 
@@ -156,11 +157,12 @@ function getAllOrgLinks($orgName){
     $allOrgNames = $orgsResults.name
 
     # write all orgas down
-    if($debug){ 
+    if($debug -or $listOrgs){ 
         write-host "*** ALL ORG NAMES ***" -ForegroundColor Cyan
         foreach($org in $allOrgNames){
             Write-host "   " $org -ForegroundColor Cyan
         }
+        if($listOrgs){ exit 1}
     }
 
     if($orgName -in $allOrgNames){
