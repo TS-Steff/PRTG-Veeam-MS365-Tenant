@@ -5,7 +5,7 @@
 
 # Compatibility
  PRTG-veeam-backup-MS365-tenants_v7.ps1 is for Veeam MS365 Backup Version 7
- PRTG-veeam-backup-MS365-tenants.ps1 is for Veeam MS365 Backup Version 8 BUT DOES ACTUALLY NOT WORK AND IS IN PROGRESS!!!
+ PRTG-veeam-backup-MS365-tenants.ps1 is for Veeam MS365 Backup Version 8
 
 # Original Links
  https://github.com/BasvanH
