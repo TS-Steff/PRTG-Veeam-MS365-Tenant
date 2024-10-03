@@ -5,7 +5,7 @@
 
 # Compatibility
 | script                                 | Veeam MS365 version |
-|----------------------------------------|---------------------|
+|:---------------------------------------|:--------------------|
 | PRTG-veeam-backup-MS365-tenants.ps1    | V8.x                |
 | PRTG-veeam-backup-MS365-tenants_v7.ps1 | V7.x                |
 
@@ -24,6 +24,17 @@
     - This way the Windows user defined on the probe is used for authenticating to VBO API, make sure the correct permissions are set in VBO for this user
 - Set preferred timeout and interval
 - I've set some default limits on the channels, change them to your preferred levels
+
+# Parameters
+| param         | example                           | type    | description
+|:--------------|:----------------------------------|:--------|:-
+| apiUrl        | https://<url-to-vbo-api>:443      | string  | The url to your Veeam MS365 API
+| username      | %windowsdomain\%username          | string  | username to connect to the API
+| password      | %windowspassword                  | string  | users passwort for API connection
+| orgName       | tenant.onmicrosoft.com            | string  | orgname in Veeam for MS365
+| ignoreSSL     | -ignoreSSL "true"                 | string  | skip SSL-Cert validation
+| jobsOnly      | -jobsOnly $true                   | boolean | returns only the job info and skips repo info
+| debug         | -debug $true                      | boolean | prints out debug info. use in PS!
 
 # History
 ## 2024-10
