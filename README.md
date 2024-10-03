@@ -36,7 +36,7 @@
 | jobsOnly      | -jobsOnly $true                   | boolean | returns only the job info and skips repo info
 | debug         | -debug $true                      | boolean | prints out debug info. use in PS!
 
-You may need to wrap string parameters in "
+You may need to wrap string parameters in quotes
 
 # History
 ## 2024-10
