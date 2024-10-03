@@ -62,7 +62,7 @@
     [string]$orgName = $(throw "<prtg><error>1</error><text>-orgName is missing in parameters</text></prtg>"),
     #[string]$ignoreDefRepo = $(throw "<prtg><error>1</error><text>-ignoreDefRepo is missing in parameters</text></prtg>"),
     [string]$ignoreSSL = $(throw "<prtg><error>1</error><text>-ignoreSSL is missing in parameters</text></prtg>"),
-    [string]$jobsOnly = $false,
+    [boolean]$jobsOnly = $false,
     [boolean]$debug = $false
 )
 
