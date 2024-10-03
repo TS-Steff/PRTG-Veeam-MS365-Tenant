@@ -156,7 +156,12 @@ function getAllOrgLinks($orgName){
     $allOrgNames = $orgsResults.name
 
     # write all orgas down
-    if($debug){ write-host $allOrgNames -ForegroundColor Cyan }
+    if($debug){ 
+        write-host "ALL ORG NAMES" -ForegroundColor Cyan
+        foreach($org in $allOrgNames){
+            Write-host "   " $org -ForegroundColor Cyan
+        }
+    }
 
     if($orgName -in $allOrgNames){
         if($debug){write-host "!!! FOUND $orgName in orglist" -ForegroundColor Red}
