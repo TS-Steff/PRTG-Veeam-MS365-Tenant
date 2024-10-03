@@ -157,7 +157,7 @@ function getAllOrgLinks($orgName){
 
     # write all orgas down
     if($debug){ 
-        write-host "ALL ORG NAMES" -ForegroundColor Cyan
+        write-host "*** ALL ORG NAMES ***" -ForegroundColor Cyan
         foreach($org in $allOrgNames){
             Write-host "   " $org -ForegroundColor Cyan
         }
