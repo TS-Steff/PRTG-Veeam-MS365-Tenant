@@ -1,29 +1,53 @@
 <#
     .SYNOPSIS
-    PRTG Veeam Backup for Microsoft 365 Advanced Sensor.
+        PRTG Veeam Backup for Microsoft 365 Advanced Sensor.
   
     .DESCRIPTION
-    Advanced Sensor will Report Job status, job nested status, repository statistics and proxy status.
+        Advanced Sensor will Report Job status, job nested status, repository statistics and proxy status.
 
-    - If not already done, enable the the API in VBO https://helpcenter.veeam.com/docs/vbo365/rest/enable_restful_api.html?ver=20
-    - On your probe, add script to 'Custom Sensors\EXEXML' folder
-    - In PRTG, on your probe add EXE/Script Advanced sensor
-    - Name the sensor eg: Veeam Backup for Office 365
-    - In the EXE/Script dropdown, select the script
-    - In parameters set: -username '%windowsdomain\%windowsuser' -password '%windowspassword' -apiUrl 'https://<url-to-vbo-api>:443' -orgName 'tenant.onmicrosoft.com' -ignoreDefRepo 'false' -ignoreSSL 'true' -debug $false
+        - If not already done, enable the the API in VBO https://helpcenter.veeam.com/docs/vbo365/rest/enable_restful_api.html?ver=20
+        - On your probe, add script to 'Custom Sensors\EXEXML' folder
+        - In PRTG, on your probe add EXE/Script Advanced sensor
+        - Name the sensor eg: Veeam Backup for Office 365
+        - In the EXE/Script dropdown, select the script
+        - In parameters set: -username '%windowsdomain\%windowsuser' -password '%windowspassword' -apiUrl 'https://<url-to-vbo-api>:443' -orgName 'tenant.onmicrosoft.com' -ignoreDefRepo 'false' -ignoreSSL 'true' -debug $false
         - This way the Windows user defined on the probe is used for authenticating to VBO API, make sure the correct permissions are set in VBO for this user
-    - Set preferred timeout and interval
-    - I've set some default limits on the channels, change them to your preferred levels
+        - Set preferred timeout and interval
+        - I've set some default limits on the channels, change them to your preferred levels
 	
+    .PARAMETER apiUrl
+        The url to your Veeam MS365 API https://<url-to-vbo-api>:443
+
+    .PARAMETER username
+        The username to connect with the API
+        %windowsdomain\%windowsuser should work within PRTG
+
+    .PARAMETER pasword
+        The users password to connect with the API
+        %windowspassword shoud work within PRTG
+    
+    .PARAMETER orgName
+        the organisation Name to check 'tenant.onmicrosoft.com'
+
+    .PARAMETER ignoreSSL
+        does not validate SSL Certificate
+
+    .PARAMETER jobsOnly
+        returns only the job results
+
+
+    .EXAMPLE
+        -username '%windowsdomain\%windowsuser' -password '%windowspassword' -apiUrl 'https://<url-to-vbo-api>:443' -orgName 'tenant.onmicrosoft.com' -ignoreDefRepo 'false' -ignoreSSL 'true' -debug $false
+
     .NOTES
-    For issues, suggetions and forking please use Github.
+        Author: TS-Management GmbH, Stefan Müller, kontakt@ts-management.ch
+
+        For issues, suggetions and forking please use Github.
    
     .LINK
-    https://github.com/BasvanH
-    https://gist.github.com/BasvanH
+        https://github.com/BasvanH
+        https://gist.github.com/BasvanH
     
-    .TODO
-    - Create Lookup OVL
 
     .NOTES
     2023-03-16 - Line 157: replacing v7 with v6 - API does not support v7 jobSessions atm.
@@ -38,6 +62,7 @@
     [string]$orgName = $(throw "<prtg><error>1</error><text>-orgName is missing in parameters</text></prtg>"),
     #[string]$ignoreDefRepo = $(throw "<prtg><error>1</error><text>-ignoreDefRepo is missing in parameters</text></prtg>"),
     [string]$ignoreSSL = $(throw "<prtg><error>1</error><text>-ignoreSSL is missing in parameters</text></prtg>"),
+    [string]$jobsOnly = $false,
     [boolean]$debug = $false
 )
 
@@ -373,7 +398,7 @@ function getOrgRepoLinks($link){
     $url = $link
 
     $headers = @{
-        "Content-Type"= "multipart/form-data";
+        "Content-Type"= "application/json";
         "Authorization" = "Bearer $accessToken";
     }
     $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
@@ -438,16 +463,17 @@ if($debug){
 }
 
 # TODO
-$orgRepoLinks = getOrgRepoLinks($orgInfos.lUsedRepos)
-$orgRepoDetails = @()
-foreach($orgRepoLink in $orgRepoLinks){
-    $orgRepoDetails += getOrgRepoDetails($orgRepoLink)
+if(-not $jobsOnly){
+    $orgRepoLinks = getOrgRepoLinks($orgInfos.lUsedRepos)
+    $orgRepoDetails = @()
+    foreach($orgRepoLink in $orgRepoLinks){
+        $orgRepoDetails += getOrgRepoDetails($orgRepoLink)
+    }
+    if($debug){
+        write-host "*** REPOS ****" -ForegroundColor Green -NoNewline
+        $orgRepoDetails | ft
+    }
 }
-if($debug){
-    write-host "*** REPOS ****" -ForegroundColor Green -NoNewline
-    $orgRepoDetails | ft
-}
-
 
 #region: Jobs to PRTG results
 Write-Host "<prtg>"
@@ -488,105 +514,67 @@ ForEach ($job in $orgJobsDetails){
                 "<LimitMinError>10485760</LimitMinError>"
                 "<LimitMode>1</LimitMode>"
                 "</result>"            
-<#
-   $channel = "Job: " + $job.Jobname + " | Success"
-    $value = $job.Success
-    Write-Host "<result>"
-                "<channel>$channel</channel>"
-                "<value>$value</value>"
-                "<unit>Count</unit>"
-                "<VolumeSize>One</VolumeSize>"
-                "<showChart>1</showChart>"
-                "<showTable>1</showTable>"
-                "</result>"
-
-    $channel = "Job: " + $job.Jobname + " | Warning"
-    $value = $job.Warning
-    Write-Host "<result>"
-                "<channel>$channel</channel>"
-                "<value>$value</value>"
-                "<unit>Count</unit>"
-                "<VolumeSize>One</VolumeSize>"
-                "<showChart>1</showChart>"
-                "<showTable>1</showTable>"
-                "<LimitMaxWarning>10</LimitMaxWarning>"
-                "<LimitMaxError>20</LimitMaxError>"
-                "<LimitMode>1</LimitMode>"
-                "</result>"
-
-    $channel = "Job: " + $job.Jobname + " | Failed"
-    $value = $job.Failed
-    Write-Host "<result>"
-                "<channel>$channel</channel>"
-                "<value>$value</value>"
-                "<unit>Count</unit>"
-                "<VolumeSize>One</VolumeSize>"
-                "<showChart>1</showChart>"
-                "<showTable>1</showTable>"
-                "<LimitMaxWarning>1</LimitMaxWarning>"
-                "<LimitMaxError>2</LimitMaxError>"
-                "<LimitMode>1</LimitMode>"
-                "</result>"
-#>
 }
 #endregion
 
 #region: Repositories to PRTG results
-ForEach ($repository in $orgRepoDetails) {
-    #$reponame = $repository.name
-    #write-host "Repo name: '$reponame'" -ForegroundColor red
+if(-not $jobsOnly){
+    ForEach ($repository in $orgRepoDetails) {
+        #$reponame = $repository.name
+        #write-host "Repo name: '$reponame'" -ForegroundColor red
 
-    if($repository.name){
-        $channel = "Repository: " + $repository.Name + " | Capacity"
-        $value = $repository.Capacity
-        Write-Host "<result>"
-                    "<channel>$channel</channel>"
-                    "<value>$value</value>"
-                    "<unit>BytesDisk</unit>"
-                    "<VolumeSize>GigaByte</VolumeSize>"
-                    "<showChart>1</showChart>"
-                    "<showTable>1</showTable>"
-                    "</result>"    
+        if($repository.name){
+            $channel = "Repository: " + $repository.Name + " | Capacity"
+            $value = $repository.Capacity
+            Write-Host "<result>"
+                        "<channel>$channel</channel>"
+                        "<value>$value</value>"
+                        "<unit>BytesDisk</unit>"
+                        "<VolumeSize>GigaByte</VolumeSize>"
+                        "<showChart>1</showChart>"
+                        "<showTable>1</showTable>"
+                        "</result>"    
 
-        $channel = "Repository: " + $repository.Name + " | Free"
-        $value = $repository.Free
-        Write-Host "<result>"
-                    "<channel>$channel</channel>"
-                    "<value>$value</value>"
-                    "<unit>BytesDisk</unit>"
-                    "<VolumeSize>GigaByte</VolumeSize>"
-                    "<showChart>1</showChart>"
-                    "<showTable>1</showTable>"
-                    "<LimitMinWarning>1073741824</LimitMinWarning>"
-                    "<LimitMinError>536870912</LimitMinError>"
-                    "<LimitMode>1</LimitMode>"
-                    "</result>"
+            $channel = "Repository: " + $repository.Name + " | Free"
+            $value = $repository.Free
+            Write-Host "<result>"
+                        "<channel>$channel</channel>"
+                        "<value>$value</value>"
+                        "<unit>BytesDisk</unit>"
+                        "<VolumeSize>GigaByte</VolumeSize>"
+                        "<showChart>1</showChart>"
+                        "<showTable>1</showTable>"
+                        "<LimitMinWarning>1073741824</LimitMinWarning>"
+                        "<LimitMinError>536870912</LimitMinError>"
+                        "<LimitMode>1</LimitMode>"
+                        "</result>"
 
-        $channel = "Repository: " + $repository.Name + " | Used"
-        $value = $repository.Capacity - $repository.Free
-        Write-Host "<result>"
-                    "<channel>$channel</channel>"
-                    "<value>$value</value>"
-                    "<unit>BytesDisk</unit>"
-                    "<VolumeSize>GigaByte</VolumeSize>"
-                    "<showChart>1</showChart>"
-                    "<showTable>1</showTable>"
-                    "</result>"   
+            $channel = "Repository: " + $repository.Name + " | Used"
+            $value = $repository.Capacity - $repository.Free
+            Write-Host "<result>"
+                        "<channel>$channel</channel>"
+                        "<value>$value</value>"
+                        "<unit>BytesDisk</unit>"
+                        "<VolumeSize>GigaByte</VolumeSize>"
+                        "<showChart>1</showChart>"
+                        "<showTable>1</showTable>"
+                        "</result>"   
 
-        $channel = "Repository: " + $repository.Name + " | Used Percent"
-        $value = 100 / $repository.Capacity * ($repository.Capacity - $repository.Free)
-        Write-Host "<result>"
-                    "<channel>$channel</channel>"
-                    "<value>$value</value>"
-                    "<unit>Percent</unit>"
-                    "<float>1</float>"
-                    "<decimalMode>All</decimalMode>"
-                    "<LimitMaxWarning>80</LimitMaxWarning>"
-                    "<LimitMaxError>90</LimitMaxError>"
-                    "<LimitMode>1</LimitMode>"
-                    "<showChart>1</showChart>"
-                    "<showTable>1</showTable>"
-                    "</result>"                            
+            $channel = "Repository: " + $repository.Name + " | Used Percent"
+            $value = 100 / $repository.Capacity * ($repository.Capacity - $repository.Free)
+            Write-Host "<result>"
+                        "<channel>$channel</channel>"
+                        "<value>$value</value>"
+                        "<unit>Percent</unit>"
+                        "<float>1</float>"
+                        "<decimalMode>All</decimalMode>"
+                        "<LimitMaxWarning>80</LimitMaxWarning>"
+                        "<LimitMaxError>90</LimitMaxError>"
+                        "<LimitMode>1</LimitMode>"
+                        "<showChart>1</showChart>"
+                        "<showTable>1</showTable>"
+                        "</result>"                            
+        }
     }
 }
 #endregion
