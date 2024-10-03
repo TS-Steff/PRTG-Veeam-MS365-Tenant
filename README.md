@@ -24,6 +24,9 @@
 - I've set some default limits on the channels, change them to your preferred levels
 
 # History
+## 2024-10
+ Added parameter to return jobs only and ignore repo info.
+
 ## 2024-09
  Script for V8. This one does not include the sensors
   - Job: *** | Success
@@ -31,3 +34,4 @@
   - Job: *** | Status  
 
 These were counters for past backups.
+
