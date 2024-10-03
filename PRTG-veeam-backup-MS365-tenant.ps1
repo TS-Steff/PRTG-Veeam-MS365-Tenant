@@ -417,7 +417,10 @@ function getOrgRepoLinks($link){
         $orgRepoLinks += $repoLink
     }
 
-    if($debug){write-host "END - getOrgRepoLinks" -ForegroundColor Cyan}
+    if($debug){
+        write-host $orgRepoLinks
+        write-host "END - getOrgRepoLinks" -ForegroundColor Cyan
+    }
     return $orgRepoLinks
 }
 
@@ -426,7 +429,11 @@ function getOrgRepoDetails($orgRepoLink){
     #write-host "*** ORG REPO LINK" $orgRepoLink -ForegroundColor Green
     $url = $orgRepoLink
 
-    $headers = @{ "Content-Type"= "multipart/form-data"; "Authorization" = "Bearer $accessToken"; }
+    $headers = @{ 
+        "Content-Type"= "application/json"; 
+        "Authorization" = "Bearer $accessToken"; 
+    }
+
     $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Headers $headers -Method Get -UseBasicParsing
 
     if($debug){Write-Host ConvertFrom-Json($jsonResult.Content) -ForegroundColor Cyan}
