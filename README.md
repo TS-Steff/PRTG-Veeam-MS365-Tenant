@@ -14,6 +14,7 @@
  https://gist.github.com/BasvanH
 
 # Install
+- ``Set-ExecutionPolicy -Scope CurrentUser`` in PS x64 AND x86
 - If not already done, enable the the API in VBO https://helpcenter.veeam.com/docs/vbo365/rest/enable_restful_api.html?ver=20
 - On your probe, add script to 'Custom Sensors\EXEXML' folder
 - In PRTG, on your probe add EXE/Script Advanced sensor
