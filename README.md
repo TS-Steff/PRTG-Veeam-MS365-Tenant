@@ -28,7 +28,7 @@
 # Parameters
 | param         | example                           | type    | description
 |:--------------|:----------------------------------|:--------|:-
-| apiUrl        | https://\<url-to-vbo-api>:443     | string  | The url to your Veeam MS365 API
+| apiUrl        | https://\<url-to-vbo-api>:4443    | string  | The url to your Veeam MS365 API
 | username      | %windowsdomain\%username          | string  | username to connect to the API
 | password      | %windowspassword                  | string  | users passwort for API connection
 | orgName       | tenant.onmicrosoft.com            | string  | orgname in Veeam for MS365
