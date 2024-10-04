@@ -11,10 +11,9 @@
 
 # Original Links
  https://github.com/BasvanH
-
  https://gist.github.com/BasvanH
 
-# Install and usage
+# Install
 - If not already done, enable the the API in VBO https://helpcenter.veeam.com/docs/vbo365/rest/enable_restful_api.html?ver=20
 - On your probe, add script to 'Custom Sensors\EXEXML' folder
 - In PRTG, on your probe add EXE/Script Advanced sensor
@@ -24,6 +23,12 @@
     - This way the Windows user defined on the probe is used for authenticating to VBO API, make sure the correct permissions are set in VBO for this user
 - Set preferred timeout and interval
 - I've set some default limits on the channels, change them to your preferred levels
+
+## Upgrade
+### v7 to v8
+ 1. Replace the skript on your probe.
+ 2. Create new Sensor with the skript and copy the parameters from the old sensor to the new.
+    - This is mandatory, as the skript for Veeam MS365 V8 does not include some values from the V7 script
 
 # Parameters
 | param         | example                           | type    | description
