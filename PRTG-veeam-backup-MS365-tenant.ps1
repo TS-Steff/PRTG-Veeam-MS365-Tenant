@@ -108,6 +108,10 @@ try {
     $jsonResult = Invoke-WebRequest -Uri $apiUrl$url -Body $body -Headers $headers -Method Post -UseBasicParsing
 } Catch {
     Write-Error "Error invoking web request at Start"
+    Write-Host $_.exception.innerexception.errorcode -BackgroundColor Red
+    Write-Host $_.exception.innerexception.Message -BackgroundColor Red
+    Write-Host $_.exception.innerexception.Data -BackgroundColor Red
+    Write-Host $_.exception.innerexception.HResult -BackgroundColor Red
 }
 
 Try {
