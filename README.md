@@ -15,25 +15,22 @@
  https://gist.github.com/BasvanH
 
 # Install
-## Full Skript
+## Base installations
 - ``Set-ExecutionPolicy -Scope CurrentUser`` in PS x64 AND x86
 - If not already done, enable the the API in VBO https://helpcenter.veeam.com/docs/vbo365/rest/enable_restful_api.html?ver=20
 - On your probe, add script to 'Custom Sensors\EXEXML' folder
+- On your probe, place ``ts.veeam.MS365.JobStatus.ovl`` in your PRTG Program Directory ``%programfiles%\PRTG Network Monitor`` or ``%programfiles(x86)%\PRTG Network Monitor`` [PRTG Manual](https://www.paessler.com/manuals/prtg/define_lookups#directory)
 - In PRTG, on your probe add EXE/Script Advanced sensor
 - Name the sensor eg: Veeam Backup for Office 365
 - In the EXE/Script dropdown, select the script
+
+## Full Skript
 - In parameters set: -username "%windowsdomain\%windowsuser" -password "%windowspassword" -apiUrl "https://\<url-to-vbo-api>:4443" -orgName "tenant.onmicrosoft.com" -ignoreSSL "false"
     - This way the Windows user defined on the probe is used for authenticating to VBO API, make sure the correct permissions are set in VBO for this user
 - Set preferred timeout and interval
 - I've set some default limits on the channels, change them to your preferred levels
 
 ## all Tenants
-- ``Set-ExecutionPolicy -Scope CurrentUser`` in PS x64 AND x86
-- If not already done, enable the the API in VBO https://helpcenter.veeam.com/docs/vbo365/rest/enable_restful_api.html?ver=20
-- On your probe, add script to 'Custom Sensors\EXEXML' folder
-- In PRTG, on your probe add EXE/Script Advanced sensor
-- Name the sensor eg: Veeam Backup for Office 365
-- In the EXE/Script dropdown, select the script
 - In parameters set: -username '%windowsdomain\%windowsuser' -password '%windowspassword' -apiUrl 'https://<url-to-vbo-api>:443' -ignoreSSL 'true' -debug $false
 - This way the Windows user defined on the probe is used for authenticating to VBO API, make sure the correct permissions are set in VBO for this user
 - Set preferred timeout and interval (do not use interval under 1h)
