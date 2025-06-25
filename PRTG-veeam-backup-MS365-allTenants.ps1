@@ -185,6 +185,7 @@ function getAllJobs(){
         # create table
         $jobObject = [PSCustomObject]@{
             "orgName"  = getOrgNameByID($job.organizationId)
+            "JobName" = $job.name
             "state" = $jobStatus
         }
         $jobsTable.add($jobObject)
@@ -210,12 +211,13 @@ $prtgResult = @"
 
 foreach($job in $jobsTable){
     $orgName = $job.orgName
+    $JobName = $job.JobName
     $jobResult = $job.state
 
 
 $prtgresult += @"
   <result>
-    <channel>$orgName</channel>
+    <channel>$JobName</channel>
     <unit>Custom</unit>
     <value>$jobResult</value>
     <showChart>1</showChart>
